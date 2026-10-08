@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>高雄在地美食探索指南 - 完整真實資料庫</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <style>
+    :root {
+      --primary: #d9480f;
+      --primary-hover: #b83204;
+      --bg: #f8f9fa;
+      --panel-bg: #ffffff;
+      --text: #212529;
+      --text-muted: #6c757d;
+      --border: #e9ecef;
+      --card-hover: #fff4e6;
+      --radius: 12px;
+      --shadow: 0 4px 16px rgba(0,0,0,0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang TC", "Microsoft JhengHei", sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* 頂部導覽列 */
+    header {
+      background: #fff;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      z-index: 1000;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-icon {
+      font-size: 26px;
+    }
+
+    .brand-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--primary);
+      letter-spacing: 0.5px;
+    }
+
+    .brand-subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .stat-badge {
+      background: #ffe8cc;
+      color: #d9480f;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 20px;
+    }
+
+    /* 主要容器 */
+    .app-container {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 65px);
+      position: relative;
+    }
+
+    /* 側邊資訊欄 */
+    .sidebar {
+      width: 440px;
+      background: var(--panel-bg);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      z-index: 500;
+      box-shadow: var(--shadow);
+    }
+
+    /* 篩選控制器 */
+    .controls {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .search-box {
+      position: relative;
+    }
+
+    .search-box input {
+      width: 100%;
+      padding: 10px 14px 10px 36px;
+      border: 1px solid #ced4da;
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-box input:focus {
+      border-color: var(--primary);
+    }
+
+    .search-box::before {
+      content: "🔍";
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .filter-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    select {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid #ced4da;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    select:focus {
+      border-color: var(--primary);
+    }
+
+    /* 列表區域 */
+    .list-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: #fdfdfd;
+    }
+
+    .restaurant-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .restaurant-card:hover {
+      border-color: #ffd8a8;
+      background: var(--card-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(217, 72, 15, 0.08);
+    }
+
+    .restaurant-card.active {
+      border-color: var(--primary);
+      background: #fff9db;
+      box-shadow: 0 0 0 2px var(--primary);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 6px;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+
+    .card-district {
+      font-size: 12px;
+      background: #e9ecef;
+      color: #495057;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .card-meta {
+      display: flex;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .badge-category {
+      background: #ffe3e3;
+      color: #c92a2a;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+
+    .badge-price {
+      background: #e6fcf5;
+      color: #0ca678;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+
+    .card-desc {
+      font-size: 13px;
+      color: #495057;
+      margin-bottom: 8px;
+      line-height: 1.45;
+    }
+
+    .card-review {
+      font-size: 12px;
+      color: #862e9c;
+      background: #f8f0fc;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border-left: 3px solid #ae3ec9;
+      line-height: 1.4;
+    }
+
+    .card-address {
+      font-size: 12px;
+      color: #868e96;
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* 地圖區域 */
+    #map {
+      flex: 1;
+      height: 100%;
+      background: #e5e5e5;
+    }
+
+    /* Leaflet Popup 樣式自訂 */
+    .leaflet-popup-content-wrapper {
+      border-radius: 12px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+      padding: 4px;
+    }
+
+    .popup-content {
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .popup-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 4px;
+    }
+
+    .popup-badges {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .popup-desc {
+      color: #333;
+      margin-bottom: 6px;
+    }
+
+    .popup-review {
+      background: #fdf2e9;
+      border-left: 3px solid #e8590c;
+      padding: 4px 8px;
+      font-size: 12px;
+      color: #d9480f;
+      border-radius: 4px;
+      margin-bottom: 8px;
+    }
+
+    .nav-btn {
+      display: inline-block;
+      text-decoration: none;
+      background: var(--primary);
+      color: #fff !important;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      text-align: center;
+      transition: background 0.2s;
+    }
+
+    .nav-btn:hover {
+      background: var(--primary-hover);
+    }
+
+    /* 響應式微調 */
+    @media (max-width: 860px) {
+      .app-container {
+        flex-direction: column-reverse;
+      }
+      .sidebar {
+        width: 100%;
+        height: 50vh;
+      }
+      #map {
+        height: 50vh;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <span class="brand-icon">🍲</span>
+      <div>
+        <div class="brand-title">高雄在地美食地圖</div>
+        <div class="brand-subtitle">完全依據實地資料庫匯入 (共 78 家)</div>
+      </div>
+    </div>
+    <div class="stat-badge" id="statBadge">顯示 78 / 78 間</div>
+  </header>
+
+  <div class="app-container">
+    <!-- 側邊欄 -->
+    <div class="sidebar">
+      <div class="controls">
+        <div class="search-box">
+          <input type="text" id="searchInput" placeholder="搜尋店名、地址、招牌料理或評論..." />
+        </div>
+        <div class="filter-row">
+          <select id="districtFilter">
+            <option value="">全高雄市 (全區)</option>
+          </select>
+          <select id="categoryFilter">
+            <option value="">所有分類</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="list-container" id="restaurantList">
+        <!-- 動態渲染店家卡片 -->
+      </div>
+    </div>
+
+    <!-- 地圖呈現 -->
+    <div id="map"></div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    // 78 筆真實 CSV 資料
+    const rawRestaurants = [
+      {"district": "鼓山區(西子灣)", "name": "阿雪小吃部", "category": "學生快炒", "price": "$65 - $110", "address": "高雄市鼓山區延平街8號", "lat": 22.6209, "lng": 120.2709, "desc": "中山大學超人氣小吃，大份量炒飯與現炒家常菜。", "review": "辣椒肉絲炒飯鍋氣足且份量極大，價格平實，中山學生共同回憶。"},
+      {"district": "鼓山區(西子灣)", "name": "漁行亮哥", "category": "日式海鮮", "price": "$200 - $450", "address": "高雄市鼓山區哨船街89號", "lat": 22.6185, "lng": 120.2692, "desc": "哨船頭漁港邊小店，主打高CP值生魚片與海鮮丼。", "review": "生魚片厚切大方且鮮度無可挑剔，炙燒丼飯油脂香氣迷人。"},
+      {"district": "鼓山區(西子灣)", "name": "好望角手作披薩", "category": "披薩/輕食", "price": "$180 - $350", "address": "高雄市鼓山區哨船街51號", "lat": 22.6179, "lng": 120.2681, "desc": "哨船頭景觀餐廳，薄脆手工披薩與海景相伴。", "review": "餅皮酥脆有嚼勁，傍晚可一邊看大船入港夕陽一邊享用。"},
+      {"district": "鼓山區(哈瑪星)", "name": "哈瑪星黑旗魚丸大王", "category": "傳統小吃", "price": "$40 - $90", "address": "高雄市鼓山區延平街84號", "lat": 22.6225, "lng": 120.2721, "desc": "哈瑪星老字號，純魚肉手打黑旗魚丸與傳統麵食。", "review": "魚丸扎實脆彈，大骨湯頭清甜回甘，加點肉燥乾麵是經典吃法。"},
+      {"district": "鼓山區(哈瑪星)", "name": "萬全肉圓米糕", "category": "傳統小吃", "price": "$40 - $90", "address": "高雄市鼓山區臨海一路1號", "lat": 22.6214, "lng": 120.2718, "desc": "飄香六十年老店，古早味清蒸肉圓與筒仔米糕。", "review": "肉圓外皮Q軟不黏牙且肉餡帶醬香，米糕淋肉燥魚鬆風味極佳。"},
+      {"district": "鼓山區(哈瑪星)", "name": "御典茶", "category": "茶飲點心", "price": "$50 - $70", "address": "高雄市鼓山區鼓元街38號", "lat": 22.6226, "lng": 120.2731, "desc": "哈瑪星排隊茶飲名店，主打蒙古鮮奶茶與免費加料。", "review": "蒙古奶茶茶香與奶香完美平衡，免費加的粉角Q彈帶勁。"},
+      {"district": "鼓山區(哈瑪星)", "name": "渡船頭海之冰", "category": "冰品點心", "price": "$60 - $250", "address": "高雄市鼓山區濱海一路76號", "lat": 22.6201, "lng": 120.2704, "desc": "大碗公冰創始元祖，招牌綜合水果刨冰。", "review": "份量可倍數放大，水果新鮮爽口，牆面塗鴉滿載青春回憶。"},
+      {"district": "鼓山區(哈瑪星)", "name": "福泉布丁豆花", "category": "冰品甜湯", "price": "$40 - $80", "address": "高雄市鼓山區濱海一路91號", "lat": 22.6204, "lng": 120.2702, "desc": "渡船頭老牌豆花店，招牌三色布丁豆花滑嫩香濃。", "review": "口感如奶酪般細緻，巧克力、雞蛋與鮮奶搭配，銅板價超高CP值。"},
+      {"district": "鼓山區(哈瑪星)", "name": "地熱小姐", "category": "甜點輕食", "price": "$130 - $250", "address": "高雄市鼓山區鼓山一路175號", "lat": 22.6231, "lng": 120.2745, "desc": "哈瑪星老宅甜點店，手作蓬鬆戚風蛋糕專賣。", "review": "戚風濕潤綿密，搭配清爽鮮奶油與時令水果，午後休憩好去處。"},
+      {"district": "鼓山區(哈瑪星)", "name": "哈瑪星廟口烤黑輪", "category": "台式點心", "price": "$20 - $70", "address": "高雄市鼓山區鼓波街27號", "lat": 22.6219, "lng": 120.2708, "desc": "代天宮廟埕炭烤手工黑輪片與大腸包小腸。", "review": "炭火慢烤外酥內軟，刷上鹹甜古早味烤醬，配醃小黃瓜極解膩。"},
+      {"district": "鼓山區(哈瑪星)", "name": "廟口臭豆腐", "category": "傳統小吃", "price": "$50 - $80", "address": "高雄市鼓山區鼓波街27號", "lat": 22.622, "lng": 120.2709, "desc": "代天宮廣場老牌酥炸臭豆腐，台式泡菜酸香開胃。", "review": "外皮炸得金黃極酥脆，內裡多汁吸飽蒜泥醬汁。"},
+      {"district": "鼓山區(哈瑪星)", "name": "丸舢盆派", "category": "日式咖哩/定食", "price": "$160 - $260", "address": "高雄市鼓山區臨海一路21-2號", "lat": 22.6215, "lng": 120.2713, "desc": "哈瑪星文青咖哩店，香濃香料咖哩飯與漢堡排。", "review": "咖哩醬濃郁微辛，炸雞外酥內嫩多汁，份量實在。"},
+      {"district": "鼓山區(哈瑪星)", "name": "初日珈琲", "category": "早午餐/輕食", "price": "$250 - $420", "address": "高雄市鼓山區鼓山二路166號", "lat": 22.6358, "lng": 120.2798, "desc": "日式老屋風格早午餐，手作烤飯糰與精緻和食定食。", "review": "烤飯糰焦香誘人，鮭魚與配菜細膩豐富，環境清幽雅緻。"},
+      {"district": "鼓山區(美術館)", "name": "貳哥食堂", "category": "台式合菜", "price": "$200 - $450", "address": "高雄市鼓山區青海路145號", "lat": 22.6568, "lng": 120.2863, "desc": "美術館旁溫馨私房餐館，招牌化骨醬燒秋刀魚。", "review": "秋刀魚燉到骨酥肉爛，口味家常下飯且不死鹹，適合家庭小聚。"},
+      {"district": "鼓山區(美術館)", "name": "碳佐麻里(高美旗艦店)", "category": "精緻燒肉", "price": "$800 - $1800", "address": "高雄市鼓山區美術東四路562號", "lat": 22.6582, "lng": 120.2934, "desc": "精品水景綠建築燒肉殿堂，高品質肉品與石鍋拌飯。", "review": "環境極具氣派與設計感，和牛油花均勻多汁，甜點飲料水準出色。"},
+      {"district": "鹽埕區", "name": "鴨肉珍", "category": "傳統小吃", "price": "$60 - $180", "address": "高雄市鹽埕區五福四路258號", "lat": 22.6247, "lng": 120.2818, "desc": "必比登推介老字號，主打肉燥鴨肉飯與綜合下水湯。", "review": "鴨肉燻香軟嫩，搭配鹹甜肉燥非常下飯，下水料脆口乾淨。"},
+      {"district": "鹽埕區", "name": "鴨肉本(二老闆的店)", "category": "傳統小吃", "price": "$60 - $180", "address": "高雄市鹽埕區富野路107號", "lat": 22.6273, "lng": 120.2809, "desc": "在地人推薦隱藏版分流店，肉燥鴨肉飯與當歸下水冬粉。", "review": "肉燥給得大方豪邁，鴨肉鮮嫩帶汁，當歸湯香醇好喝。"},
+      {"district": "鹽埕區", "name": "港園牛肉麵", "category": "麵食小吃", "price": "$120 - $160", "address": "高雄市鹽埕區大成街55號", "lat": 22.6234, "lng": 120.2852, "desc": "六十年老店，招牌豬油香乾拌牛肉麵與牛肉湯麵。", "review": "牛肉塊厚實且燉至軟嫩，麵條彈牙吸汁，加入蒜泥更加提味。"},
+      {"district": "鹽埕區", "name": "北港蔡三代筒仔米糕", "category": "傳統小吃", "price": "$40 - $100", "address": "高雄市鹽埕區河西路167號", "lat": 22.6289, "lng": 120.2858, "desc": "愛河旁老字號筒仔米糕與招牌蒸蛋湯。", "review": "米糕粒粒分明富含滷肉香，蒸蛋湯細嫩如布丁，湯頭鮮美。"},
+      {"district": "鹽埕區", "name": "阿英排骨飯", "category": "便當快餐", "price": "$80 - $150", "address": "高雄市鹽埕區富野路79-2號", "lat": 22.6277, "lng": 120.2818, "desc": "鹽埕必吃古早味炸排骨飯，厚切醃漬帶骨排骨。", "review": "排骨醃製入味且炸得外酥肉嫩，淋肉燥白飯配炒酸菜超對味。"},
+      {"district": "鹽埕區", "name": "米糕城", "category": "傳統小吃", "price": "$45 - $100", "address": "高雄市鹽埕區大仁路107號", "lat": 22.6258, "lng": 120.2831, "desc": "老鹽埕知名米糕店，米糕淋上肉燥並灑上旗魚鬆與小黃瓜。", "review": "糯米Q彈黏香，魚鬆與肉燥完美結合，四神湯甘甜順口。"},
+      {"district": "鹽埕區", "name": "大ㄎㄡ胖碳烤三明治", "category": "宵夜早點", "price": "$40 - $80", "address": "高雄市鹽埕區大公路78號", "lat": 22.6282, "lng": 120.2835, "desc": "炭火慢烤吐司夾入特製現煎嫩蛋、小黃瓜與燒肉。", "review": "炭香濃郁，美乃滋特調酸甜爽口，煎蛋厚實軟嫩。"},
+      {"district": "鹽埕區", "name": "天天沙茶牛肉火鍋", "category": "沙茶火鍋", "price": "$350 - $700", "address": "高雄市鹽埕區七賢三路240號", "lat": 22.6271, "lng": 120.2825, "desc": "老字號溫體牛沙茶火鍋，自製古早味濃郁沙茶醬。", "review": "手工炒製沙茶底帶花生芝麻香，溫體牛肉質粉嫩鮮甜。"},
+      {"district": "鹽埕區", "name": "老王壽司", "category": "平價日本料理", "price": "$50 - $200", "address": "高雄市鹽埕區必忠街51號", "lat": 22.6236, "lng": 120.2834, "desc": "鹽埕巷弄內台味日式小吃，生魚片、炒烏龍與綜合壽司。", "review": "生魚片厚度實在價格親民，台式壽司醋飯酸甜開胃，CP值極高。"},
+      {"district": "鹽埕區", "name": "李家圓仔冰", "category": "甜品點心", "price": "$40 - $60", "address": "高雄市鹽埕區五福四路234號", "lat": 22.6249, "lng": 120.2822, "desc": "傳承數十載手工現揉現煮湯圓八寶冰。", "review": "湯圓現煮冰鎮後口感極Q彈，紅豆綠豆綿密，糖水香甜不膩。"},
+      {"district": "鹽埕區", "name": "阿蘭麵店", "category": "傳統麵食", "price": "$40 - $90", "address": "高雄市鹽埕區新興街34號", "lat": 22.6278, "lng": 120.2839, "desc": "鹽埕在地人低調早午餐麵攤，手工意麵與黑白切小菜。", "review": "意麵拌入古早味油蔥豬油香氣撲鼻，滷味小菜切盤新鮮便宜。"},
+      {"district": "鹽埕區", "name": "阿綿麻糬", "category": "甜點伴手禮", "price": "$45 - $80", "address": "高雄市鹽埕區新樂街198-27號", "lat": 22.6241, "lng": 120.2813, "desc": "巷弄內手作大福與麻糬，招牌草莓大福與芋頭麻糬。", "review": "外皮軟糯細緻拉絲，內餡芋泥香醇不過甜，季節水果多汁。"},
+      {"district": "鹽埕區", "name": "双妃奶茶", "category": "飲料點心", "price": "$45 - $65", "address": "高雄市鹽埕區新樂街173號", "lat": 22.6242, "lng": 120.282, "desc": "新樂街奶茶一條街名店，鮮奶茶免費加珍珠粉圓。", "review": "茶韻清爽回甘，加珍珠軟Q微甜，不加冰塊保留濃醇滋味。"},
+      {"district": "前金區", "name": "牛老大涮牛肉(自強總店)", "category": "火鍋/台菜", "price": "$500 - $900", "address": "高雄市前金區自強二路18號", "lat": 22.6212, "lng": 120.2974, "desc": "每天台南直送溫體牛，蔬果大骨清甜湯底。", "review": "溫體牛切片輕涮數秒粉嫩入口，熱炒牛雜與芥藍牛肉鍋氣十足。"},
+      {"district": "前金區", "name": "前金肉燥飯", "category": "傳統小吃", "price": "$40 - $120", "address": "高雄市前金區大同二路26號", "lat": 22.6272, "lng": 120.2965, "desc": "傳承三代手切肉燥飯，加半熟鴨蛋為必吃招牌。", "review": "肉燥肥而不膩帶滿滿膠質，戳破蛋黃拌飯香氣濃郁無比。"},
+      {"district": "前金區", "name": "興隆居", "category": "早餐/麵食", "price": "$30 - $90", "address": "高雄市前金區六合二路186號", "lat": 22.6318, "lng": 120.2949, "desc": "超人氣排隊早餐，招牌高麗菜鮮肉湯包與現炸油條燒餅。", "review": "湯包外皮鬆軟、咬下爆鮮甜高麗菜湯汁，燒餅酥香層次分明。"},
+      {"district": "前金區", "name": "前金黑輪伯", "category": "台式黑輪", "price": "$20 - $70", "address": "高雄市前金區文武三街56號", "lat": 22.6243, "lng": 120.2961, "desc": "前金低調老攤烤黑輪與關東煮，免費甘甜大骨湯任喝。", "review": "手工黑輪片烤得表皮酥脆內裡軟Q，湯頭熬煮蘿蔔鮮甜無比。"},
+      {"district": "前金區", "name": "老江紅茶牛奶(總店)", "category": "宵夜早點", "price": "$50 - $120", "address": "高雄市前金區南台路51號", "lat": 22.6315, "lng": 120.3005, "desc": "高雄老字號早點兼宵夜，古早味紅茶牛奶與火腿蛋吐司。", "review": "特調紅茶帶微苦焦香，搭配高牧鮮乳極香濃，半熟煎蛋吐司絕配。"},
+      {"district": "前金區", "name": "七賢鴨肉飯", "category": "傳統小吃", "price": "$50 - $120", "address": "高雄市前金區七賢二路220號", "lat": 22.6332, "lng": 120.2943, "desc": "高雄八十年鴨肉飯元祖店，煙燻鴨肉與當歸鴨湯。", "review": "鴨肉絲軟嫩，鴨油淋飯香氣濃郁，當歸鴨湯溫補回甘。"},
+      {"district": "前金區", "name": "小南碗粿", "category": "傳統點心", "price": "$35 - $70", "address": "高雄市前金區自強一路89號", "lat": 22.6312, "lng": 120.2962, "desc": "台南風味傳統手工碗粿，包入肉燥、香菇與蛋黃。", "review": "碗粿口感扎實軟Q，淋上甜鹹自製油膏與蒜泥十分合拍。"},
+      {"district": "新興區", "name": "汕頭泉成沙茶火鍋(中山總店)", "category": "火鍋/台菜", "price": "$400 - $800", "address": "高雄市新興區中山橫路7號", "lat": 22.6312, "lng": 120.3015, "desc": "捷運美麗島站旁八十年老店，自製純手工扁魚沙茶底。", "review": "自製沙茶醬香氣厚實，扁魚高湯越煮越甘甜，手作丸餃扎實。"},
+      {"district": "新興區", "name": "米院子油飯", "category": "傳統小吃", "price": "$60 - $150", "address": "高雄市新興區南海街30號", "lat": 22.6288, "lng": 120.3073, "desc": "巷弄紅磚老屋內，主打古早味油飯與原盅燉湯。", "review": "油飯麻油蝦米香氣均勻且米粒Q彈，蒸蛤蜊排骨湯清甜甘醇。"},
+      {"district": "新興區", "name": "逸之牛日式炸牛排專門店", "category": "日式料理", "price": "$350 - $650", "address": "高雄市新興區中正四路46號", "lat": 22.6305, "lng": 120.3023, "desc": "高雄炸牛排元祖，酥脆麵衣包裹粉嫩牛排附小烤爐。", "review": "肉質鮮嫩多汁，可依個人喜好自行煎至理想熟度，高麗菜絲清爽。"},
+      {"district": "新興區", "name": "大同牛肉麵", "category": "麵食小吃", "price": "$110 - $180", "address": "高雄市新興區復興一路81號", "lat": 22.6289, "lng": 120.3102, "desc": "老字號紅燒與清燉牛肉麵，手工拉麵彈牙有勁。", "review": "紅燒湯頭醇厚微辣不燥，牛腱肉滷得極透，小菜豆乾海帶必點。"},
+      {"district": "新興區", "name": "諭泉冰果店", "category": "冰品甜點", "price": "$45 - $90", "address": "高雄市新興區忠孝一路252號", "lat": 22.6301, "lng": 120.3088, "desc": "台灣第一家紅茶豆漿創始店，傳統冰品與現烤土司。", "review": "紅茶豆漿香醇順口，比例恰到好處，下午茶或消夜都很合適。"},
+      {"district": "苓雅區", "name": "厚得福湯包麵食專賣店", "category": "北方麵食", "price": "$90 - $220", "address": "高雄市苓雅區成功一路214號", "lat": 22.6179, "lng": 120.2979, "desc": "排隊北方麵食名店，內用提供免費豆漿與紅茶無限享用。", "review": "鮮肉湯包皮薄多汁，牛肉捲餅外酥內香，豆漿加紅茶混搭絕配。"},
+      {"district": "苓雅區", "name": "老二腿庫飯", "category": "台式熱炒", "price": "$80 - $250", "address": "高雄市苓雅區興中二路118號", "lat": 22.6163, "lng": 120.3024, "desc": "晚餐至深夜人氣熱炒，招牌肉燥腿庫飯與現煎蚵仔蛋。", "review": "腿庫皮Q軟嫩膠質豐厚，醬汁鹹甜恰到好處，熱炒類鑊氣十足。"},
+      {"district": "苓雅區", "name": "正義蚵仔麵線", "category": "傳統小吃", "price": "$55 - $90", "address": "高雄市苓雅區正義路146號", "lat": 22.6321, "lng": 120.3421, "desc": "排隊名店蚵仔麵線，大顆鮮蚵搭配滷大腸與赤肉。", "review": "湯頭柴魚香氣濃郁，大腸滷得軟爛入味，蚵仔肥美多汁無腥味。"},
+      {"district": "苓雅區", "name": "光華夜市宗鴨肉麵", "category": "傳統麵食", "price": "$60 - $120", "address": "高雄市苓雅區光華二路400號", "lat": 22.6152, "lng": 120.3182, "desc": "光華夜市煙燻當歸鴨肉麵與下水乾拌冬粉。", "review": "鴨肉煙燻香氣濃郁，乾拌麵淋上香濃鴨油，深夜填飽肚子的好選擇。"},
+      {"district": "苓雅區", "name": "約翰碳烤三明治", "category": "宵夜早點", "price": "$45 - $90", "address": "高雄市苓雅區光華二路400號", "lat": 22.6153, "lng": 120.3183, "desc": "光華夜市炭火現烤三明治，招牌燒肉蛋三明治。", "review": "炭香吐司夾上厚實軟嫩煎蛋與醃漬入味豬排，宵夜人潮不斷。"},
+      {"district": "苓雅區", "name": "輝哥鱔魚花枝麵", "category": "台式熱炒", "price": "$100 - $180", "address": "高雄市苓雅區光華二路436號", "lat": 22.6146, "lng": 120.3184, "desc": "大火爆炒鱔魚意麵與生炒花枝，酸甜台南風味芡汁。", "review": "鱔魚口感爽脆無腥味，大火爆炒鍋氣十足，意麵吸飽濃稠湯汁。"},
+      {"district": "三民區", "name": "老新台菜(九如創始店)", "category": "精緻台菜", "price": "$800 - $1500", "address": "高雄市三民區九如二路227號", "lat": 22.6418, "lng": 120.3082, "desc": "復古洋樓美學新派台菜無菜單料理，兼具古早味與創意。", "review": "招牌芋頭西米露濃郁綿密，料理擺盤講究精緻，宴客聚會首選。"},
+      {"district": "三民區", "name": "侯記鴨肉飯", "category": "傳統小吃", "price": "$50 - $120", "address": "高雄市三民區自強一路201號", "lat": 22.6373, "lng": 120.2957, "desc": "三民市場老字號，煙燻鴨肉與甘醇當歸鴨湯。", "review": "鴨肉嫩口多汁帶淡雅燻香，當歸湯甘醇無苦味，米血軟糯好吃。"},
+      {"district": "三民區", "name": "廖家黑輪", "category": "台式黑輪", "price": "$20 - $70", "address": "高雄市三民區三民街191號", "lat": 22.6359, "lng": 120.2965, "desc": "三民市場數十年老攤，現烤手工黑輪片與關東煮。", "review": "現烤黑輪片外皮焦香酥脆，抹上鹹甜醬汁，免費大骨湯清甜無限喝。"},
+      {"district": "三民區", "name": "上海生煎湯包", "category": "北方麵食", "price": "$60 - $100", "address": "高雄市三民區熱河一街208號", "lat": 22.6447, "lng": 120.3075, "desc": "高醫商圈超人氣排隊生煎包，底部焦脆一口咬下爆汁。", "review": "皮薄餡豐，肉汁極度燙口鮮美，搭配特製辣醬超滿足。"},
+      {"district": "三民區", "name": "吉林夜市吉品蒸餃", "category": "北方麵食", "price": "$60 - $100", "address": "高雄市三民區吉林街137號", "lat": 22.6453, "lng": 120.3083, "desc": "現包現蒸薄皮爆汁蒸餃與酸辣湯，平價銅板宵夜名店。", "review": "蒸餃皮薄如紙，內餡肉質鮮甜帶汁，酸辣湯料多實在。"},
+      {"district": "三民區", "name": "高醫小雅茶飲", "category": "茶飲點心", "price": "$40 - $70", "address": "高雄市三民區熱河一街204號", "lat": 22.6446, "lng": 120.3076, "desc": "高醫排隊傳奇飲料，招牌芋頭西米露真材實料滿杯芋泥。", "review": "芋泥濃稠綿密幾乎整杯都是料，椰奶香醇順口，甜食控必喝。"},
+      {"district": "左營區", "name": "正宗鴨肉飯", "category": "傳統小吃", "price": "$60 - $150", "address": "高雄市左營區裕誠路245號", "lat": 22.6635, "lng": 120.3085, "desc": "裕誠商圈人氣鴨肉店，去骨煙燻鴨肉片鋪滿白飯。", "review": "鴨肉去骨方便吃且帶甘蔗燻香，淋上濃郁鴨油飯香四溢。"},
+      {"district": "左營區", "name": "西安麵食館", "category": "特色麵食", "price": "$90 - $220", "address": "高雄市左營區勝利路115巷6號", "lat": 22.6806, "lng": 120.2928, "desc": "蓮池潭旁陜西眷村特色麵食，超寬皮帶麵與香辣肉食。", "review": "現扯皮帶麵勁道十足，香辣牛骨髓與孜然肉夾饃風味獨特地道。"},
+      {"district": "左營區", "name": "汾陽餛飩(左營老店)", "category": "傳統麵食", "price": "$60 - $110", "address": "高雄市左營區左營大路84號", "lat": 22.6912, "lng": 120.2923, "desc": "左營大路數十年傳奇餛飩湯，可加鹹湯圓與半熟水煮蛋。", "review": "餛飩皮薄肉餡鮮甜滑嫩，戳破蛋黃混入大骨湯頭更加濃郁好喝。"},
+      {"district": "左營區", "name": "三牛牛肉麵(犇)", "category": "麵食小吃", "price": "$120 - $220", "address": "高雄市左營區勝利路85號", "lat": 22.6809, "lng": 120.2933, "desc": "蓮池潭旁超大份量眷村牛肉麵，紅燒牛雜與清燉牛肉麵。", "review": "湯頭濃郁肉塊大又軟嫩，小菜櫃琳瑯滿目，份量大到需要共食。"},
+      {"district": "左營區", "name": "吉品屋拉麵", "category": "日式拉麵", "price": "$180 - $280", "address": "高雄市左營區富民路357號", "lat": 22.6611, "lng": 120.3054, "desc": "裕誠商圈高CP值日式濃厚豚骨拉麵與特製叉燒飯。", "review": "豚骨湯頭醇厚膠質豐富，叉燒炙燒香氣濃郁，可免費續麵一次。"},
+      {"district": "左營區", "name": "寬來順早餐店", "category": "中式早點", "price": "$20 - $60", "address": "高雄市左營區中華一路5-14號", "lat": 22.6821, "lng": 120.2905, "desc": "果貿眷村排隊早餐，肉包、燒餅夾酸菜蛋與鹹豆漿。", "review": "肉包皮Q肉汁香，燒餅夾蔥蛋淋辣醬酸菜非常開胃，價格銅板超便宜。"},
+      {"district": "前鎮區", "name": "小燉食室", "category": "燉湯定食", "price": "$200 - $350", "address": "高雄市前鎮區廣西路226號", "lat": 22.6167, "lng": 120.3134, "desc": "老台電宿舍群改建文青店，專注原盅精緻燉湯與米食。", "review": "清燉牛肉與剝皮辣椒雞湯甘甜爽口，肉質軟嫩，環境舒適用心。"},
+      {"district": "前鎮區", "name": "汕頭陽春麵", "category": "傳統麵食", "price": "$45 - $90", "address": "高雄市前鎮區林森三路63號", "lat": 22.6148, "lng": 120.3082, "desc": "傳承數十年汕頭乾麵，自製特調沙茶油蔥與手工細麵。", "review": "麵條彈牙吸醬，自炒沙茶香氣濃而不膩，骨仔肉湯鮮甜脆口。"},
+      {"district": "前鎮區", "name": "前鎮夜市阿英海產粥", "category": "海鮮海產粥", "price": "$100 - $160", "address": "高雄市前鎮區擴建路15號", "lat": 22.5975, "lng": 120.3089, "desc": "前鎮夜市老牌澎湃海產粥與鮮蚵湯，料多大碗又鮮美。", "review": "白蝦、鮮蚵、蛤蜊與小卷給料大方，湯頭鮮美清甜，海味滿滿。"},
+      {"district": "鳳山區", "name": "老張愛玉冰黑糖剉冰", "category": "冰品甜湯", "price": "$40 - $70", "address": "高雄市鳳山區信義街11號", "lat": 22.6256, "lng": 120.3582, "desc": "中華街夜市老字號，純天然手洗愛玉凍與手炒黑糖刨冰。", "review": "天然愛玉口感滑順天然，檸檬汁酸甜比例完美，消暑首選。"},
+      {"district": "鳳山區", "name": "鳳邑麵線", "category": "傳統小吃", "price": "$45 - $80", "address": "高雄市鳳山區安寧街2巷1號", "lat": 22.6288, "lng": 120.3541, "desc": "鳳山排隊代表小吃，大腸蚵仔麵線、肉圓與米糕。", "review": "麵線糊稠度剛好，大腸滷透入味帶嚼勁，肉圓清蒸皮Q肉餡香。"},
+      {"district": "鳳山區", "name": "潮州牛肉林", "category": "麵食小吃", "price": "$120 - $220", "address": "高雄市鳳山區武營路418號", "lat": 22.6133, "lng": 120.3341, "desc": "南部知名溫體牛料理與牛雜湯，湯頭帶九層塔香氣。", "review": "牛肉片粉嫩鮮甜，牛雜燉得軟爛入味，九層塔湯底清香回甘。"},
+      {"district": "鳳山區", "name": "南台春捲", "category": "特色小吃", "price": "$50 - $80", "address": "高雄市鳳山區五甲一路12號", "lat": 22.6247, "lng": 120.3586, "desc": "鳳山捷運站旁老牌大春捲，包入滿滿高麗菜、燒肉與花生糖粉。", "review": "春捲外皮現做有韌性，內餡清脆多汁，可自選甜度非常貼心。"},
+      {"district": "旗津區", "name": "鴨角活海產", "category": "海鮮熱炒", "price": "$300 - $600", "address": "高雄市旗津區廟前路22號", "lat": 22.6138, "lng": 120.2687, "desc": "旗津老街人氣活海鮮熱炒，每日漁港現撈海鮮與炒螃蟹。", "review": "海鮮鮮度高、料理手法乾淨不油膩，價格透明實在。"},
+      {"district": "旗津區", "name": "不一樣赤肉羹", "category": "傳統小吃", "price": "$50 - $90", "address": "高雄市旗津區廟前路56號", "lat": 22.6143, "lng": 120.2689, "desc": "旗津老街特色炸赤肉羹麵，炸肉塊外酥內扎實。", "review": "赤肉塊先炸後入羹湯，外皮微酥吸附柴魚扁魚芡汁，香氣獨特。"},
+      {"district": "楠梓區", "name": "北平楊寶寶蒸餃(朝明旗艦店)", "category": "北方麵食", "price": "$80 - $200", "address": "高雄市楠梓區朝明路106號", "lat": 22.7297, "lng": 120.3242, "desc": "北高排隊蒸餃傳奇，招牌豬肉/牛肉蒸餃與鍋貼捲餅。", "review": "蒸餃皮薄咬下即爆出大量鮮美肉汁，捲餅香脆厚實，CP值極高。"},
+      {"district": "楠梓區", "name": "右昌肉圓", "category": "傳統小吃", "price": "$35 - $70", "address": "高雄市楠梓區右昌街261號", "lat": 22.7121, "lng": 120.2872, "desc": "右昌在地古早味清蒸肉圓與四神湯，飄香三十年。", "review": "純米漿製作的清蒸外皮軟嫩細緻，豬肉內餡帶中藥醬香，醬汁微甜。"},
+      {"district": "仁武區", "name": "仁武烤鴨", "category": "燒臘烤鴨", "price": "$150 - $400", "address": "高雄市仁武區鳳仁路95-21號", "lat": 22.6881, "lng": 120.3546, "desc": "高雄超人氣排隊烤鴨，現烤焦脆片皮鴨搭配手工烙荷葉餅皮。", "review": "鴨皮酥脆多汁油脂豐沛，九層塔炒鴨架醬香濃郁，炒米血必點。"},
+      {"district": "岡山區", "name": "源坐羊肉", "category": "羊肉料理", "price": "$150 - $450", "address": "高雄市岡山區中華路1-2號", "lat": 22.7981, "lng": 120.2973, "desc": "岡山五十年羊肉名店，羊肉爐、當歸羊肉與蔥爆羊肉。", "review": "溫體羊肉無羶味肉質軟嫩，當歸高湯甘甜順口，羊肉水餃風味獨具。"},
+      {"district": "岡山區", "name": "舊市羊肉", "category": "羊肉料理", "price": "$150 - $450", "address": "高雄市岡山區河華路111號", "lat": 22.7994, "lng": 120.2915, "desc": "岡山現宰國產溫體羊肉爐與麻油羊肉熱炒。", "review": "現宰羊肉湯鮮甜帶肉香，沾自製豆瓣醬風味絕佳，炒羊髓滑嫩。"},
+      {"district": "旗山區", "name": "旗山紅糟肉", "category": "傳統小吃", "price": "$50 - $120", "address": "高雄市旗山區延平一路435號", "lat": 22.8872, "lng": 120.4812, "desc": "旗山老街八十年老店，招牌酥炸紅糟肉與手工粉腸。", "review": "炸紅糟肉外層焦脆且肉質軟嫩帶微甜香氣，粉腸沾自製沾醬極對味。"},
+      {"district": "旗山區", "name": "旗山老街鄭家陽春麵", "category": "傳統麵食", "price": "$45 - $90", "address": "高雄市旗山區中山路62號", "lat": 22.8863, "lng": 120.4824, "desc": "旗山老街古早味乾麵與黑白切滷味，手工自炸豬油油蔥。", "review": "簡單的豬油油蔥拌手工意麵香氣迷人，滷味切盤入味且價格實在。"},
+      {"district": "美濃區", "name": "美濃林家粄條", "category": "客家小吃", "price": "$60 - $180", "address": "高雄市美濃區美興街25號", "lat": 22.8993, "lng": 120.5312, "desc": "美濃五十年老牌客家粄條，炒粄條與客家小炒。", "review": "手作純米粄條口感Q韌，爆炒油蔥酥香氣四溢，炒野蓮清脆爽口。"},
+      {"district": "橋頭區", "name": "黃家肉燥飯", "category": "傳統小吃", "price": "$40 - $90", "address": "高雄市橋頭區橋南路106號", "lat": 22.7571, "lng": 120.3115, "desc": "必比登推介橋頭老街肉燥飯，炭火慢燉切丁肉燥與肉羹。", "review": "肉燥肥而不膩帶迷人醬香與膠質，肉羹扎實脆彈，在地人從小吃到大。"},
+      {"district": "小港區", "name": "小港奧斯汀人文咖啡", "category": "早午餐/輕食", "price": "$150 - $320", "address": "高雄市小港區立權路77號", "lat": 22.5684, "lng": 120.3542, "desc": "小港隱密南洋度假風庭園餐廳，輕食定食與特調飲品。", "review": "環境綠意盎然如置身峇里島，餐點份量扎實且口味用心。"},
+      {"district": "大寮區", "name": "大寮老楊牛肉麵", "category": "特色麵食", "price": "$90 - $160", "address": "高雄市大寮區鳳林三路536號", "lat": 22.6025, "lng": 120.3951, "desc": "大寮在地排隊平價牛肉麵與大份量水餃。", "review": "牛肉厚切燉煮軟嫩入味，湯頭香濃微辣，大水餃皮Q內餡飽滿。"}
+    ];
+
+    // 初始化地圖（中心設定在高雄市中心）
+    const map = L.map('map', {
+      zoomControl: true
+    }).setView([22.628, 120.295], 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19
+    }).addTo(map);
+
+    // 地標圖標樣式生成
+    function createCustomIcon(category) {
+      return L.divIcon({
+        className: 'custom-div-icon',
+        html: `
+          <div style="
+            background-color: #d9480f;
+            width: 28px;
+            height: 28px;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            border: 2px solid #ffffff;
+          ">
+            <span style="transform: rotate(45deg); font-size: 13px;">🍴</span>
+          </div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 28],
+        popupAnchor: [0, -28]
+      });
+    }
+
+    let markers = [];
+    let currentFiltered = [...rawRestaurants];
+
+    // 建立下拉選單項目
+    function setupFilters() {
+      const districts = [...new Set(rawRestaurants.map(r => r.district))].sort();
+      const categories = [...new Set(rawRestaurants.map(r => r.category))].sort();
+
+      const districtSelect = document.getElementById('districtFilter');
+      districts.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.textContent = d;
+        districtSelect.appendChild(opt);
+      });
+
+      const categorySelect = document.getElementById('categoryFilter');
+      categories.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        categorySelect.appendChild(opt);
+      });
+    }
+
+    // 渲染地圖標記與列表卡片
+    function renderApp(data) {
+      // 清空舊標記
+      markers.forEach(m => map.removeLayer(m));
+      markers = [];
+
+      const listContainer = document.getElementById('restaurantList');
+      listContainer.innerHTML = '';
+
+      document.getElementById('statBadge').textContent = `顯示 ${data.length} / ${rawRestaurants.length} 間`;
+
+      if (data.length === 0) {
+        listContainer.innerHTML = `
+          <div style="text-align: center; color: var(--text-muted); padding: 40px 10px;">
+            <p style="font-size: 24px; margin-bottom: 8px;">🔍</p>
+            <p>沒有符合條件的美食店家</p>
+          </div>`;
+        return;
+      }
+
+      const bounds = L.latLngBounds();
+
+      data.forEach((item, index) => {
+        // 加入標記到地圖
+        const marker = L.marker([item.lat, item.lng], {
+          icon: createCustomIcon(item.category)
+        }).addTo(map);
+
+        const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(item.name + ' ' + item.address)}`;
+        
+        const popupContent = `
+          <div class="popup-content">
+            <div class="popup-title">${item.name}</div>
+            <div class="popup-badges">
+              <span class="badge-category">${item.category}</span>
+              <span class="badge-price">${item.price}</span>
+            </div>
+            <div class="popup-desc">${item.desc}</div>
+            <div class="popup-review"><strong>💬 老饕短評：</strong>${item.review}</div>
+            <div style="color: #666; font-size: 11px; margin-bottom: 8px;">📍 ${item.address}</div>
+            <a href="${navUrl}" target="_blank" rel="noopener noreferrer" class="nav-btn">Google 導航路線 ↗</a>
+          </div>
+        `;
+
+        marker.bindPopup(popupContent);
+        markers.push(marker);
+        bounds.extend([item.lat, item.lng]);
+
+        // 建立左側列表卡片
+        const card = document.createElement('div');
+        card.className = 'restaurant-card';
+        card.id = `card-${index}`;
+        card.innerHTML = `
+          <div class="card-header">
+            <span class="card-title">${item.name}</span>
+            <span class="card-district">${item.district}</span>
+          </div>
+          <div class="card-meta">
+            <span class="badge-category">${item.category}</span>
+            <span class="badge-price">${item.price}</span>
+          </div>
+          <div class="card-desc">${item.desc}</div>
+          <div class="card-review">💬 ${item.review}</div>
+          <div class="card-address">📍 ${item.address}</div>
+        `;
+
+        // 點擊卡片時地圖平移並打開 Popup
+        card.addEventListener('click', () => {
+          document.querySelectorAll('.restaurant-card').forEach(c => c.classList.remove('active'));
+          card.classList.add('active');
+          map.flyTo([item.lat, item.lng], 16, { animate: true, duration: 0.8 });
+          marker.openPopup();
+        });
+
+        // 點擊標記時高亮對應卡片並平滑滾動
+        marker.on('click', () => {
+          document.querySelectorAll('.restaurant-card').forEach(c => c.classList.remove('active'));
+          card.classList.add('active');
+          card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+
+        listContainer.appendChild(card);
+      });
+
+      // 自動縮放視野以包含所有結果
+      if (data.length > 0) {
+        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+      }
+    }
+
+    // 篩選核心邏輯
+    function applyFilter() {
+      const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
+      const district = document.getElementById('districtFilter').value;
+      const category = document.getElementById('categoryFilter').value;
+
+      currentFiltered = rawRestaurants.filter(item => {
+        const matchesKeyword = !keyword || (
+          item.name.toLowerCase().includes(keyword) ||
+          item.address.toLowerCase().includes(keyword) ||
+          item.desc.toLowerCase().includes(keyword) ||
+          item.review.toLowerCase().includes(keyword) ||
+          item.category.toLowerCase().includes(keyword)
+        );
+
+        const matchesDistrict = !district || item.district === district;
+        const matchesCategory = !category || item.category === category;
+
+        return matchesKeyword && matchesDistrict && matchesCategory;
+      });
+
+      renderApp(currentFiltered);
+    }
+
+    // 事件監聽綁定
+    document.getElementById('searchInput').addEventListener('input', applyFilter);
+    document.getElementById('districtFilter').addEventListener('change', applyFilter);
+    document.getElementById('categoryFilter').addEventListener('change', applyFilter);
+
+    // 啟動應用
+    setupFilters();
+    renderApp(rawRestaurants);
+  </script>
+</body>
+</html>
